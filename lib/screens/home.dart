@@ -63,7 +63,172 @@ class Movie {
   }
 }
 
-// 히어로 배너 위젯
+// ✨ 새로 추가: 커스텀 페이지 라우트 트랜지션
+class PosterExpansionRoute<T> extends PageRouteBuilder<T> {
+  final Widget child;
+  final Rect startRect;
+  final String heroTag;
+
+  PosterExpansionRoute({
+    required this.child,
+    required this.startRect,
+    required this.heroTag,
+    super.settings,
+  }) : super(
+         transitionDuration: const Duration(milliseconds: 600),
+         reverseTransitionDuration: const Duration(milliseconds: 400),
+         pageBuilder: (context, animation, secondaryAnimation) => child,
+         transitionsBuilder: (context, animation, secondaryAnimation, child) {
+           final curvedAnimation = CurvedAnimation(
+             parent: animation,
+             curve: Curves.easeOutCubic,
+             reverseCurve: Curves.easeInCubic,
+           );
+
+           return FadeTransition(
+             opacity: curvedAnimation,
+             child: ScaleTransition(
+               scale: Tween<double>(
+                 begin: 0.8,
+                 end: 1.0,
+               ).animate(curvedAnimation),
+               child: child,
+             ),
+           );
+         },
+       );
+}
+
+// ✨ 새로 추가: 영화 카드 위젯
+class MovieCard extends StatelessWidget {
+  final Movie movie;
+  final double width;
+  final double height;
+
+  const MovieCard({
+    super.key,
+    required this.movie,
+    this.width = 160,
+    this.height = 220,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => _navigateToDetails(context),
+      child: Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha((255 * 0.3).round()),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Stack(
+            children: [
+              // Hero 위젯으로 포스터 이미지
+              Hero(
+                tag: 'movie_poster_${movie.id}',
+                child: Material(
+                  type: MaterialType.transparency,
+                  child: Image.network(
+                    movie.posterUrl,
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    height: double.infinity,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return Container(
+                        color: Colors.grey[800],
+                        child: const Center(
+                          child: CircularProgressIndicator(
+                            color: Colors.amber,
+                            strokeWidth: 2,
+                          ),
+                        ),
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        color: Colors.grey[800],
+                        child: const Icon(
+                          Icons.movie,
+                          color: Colors.white54,
+                          size: 48,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              // 평점 배지
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withAlpha((255 * 0.7).round()),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.star, color: Colors.amber, size: 16),
+                      const SizedBox(width: 2),
+                      Text(
+                        movie.voteAverage.toStringAsFixed(1),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _navigateToDetails(BuildContext context) {
+    // 현재 포스터의 위치 정보를 가져옴
+    final RenderBox renderBox = context.findRenderObject() as RenderBox;
+    final offset = renderBox.localToGlobal(Offset.zero);
+    final size = renderBox.size;
+    final startRect = Rect.fromLTWH(
+      offset.dx,
+      offset.dy,
+      size.width,
+      size.height,
+    );
+
+    Navigator.push(
+      context,
+      PosterExpansionRoute(
+        child: EnhancedDetailsScreen(movie: movie),
+        startRect: startRect,
+        heroTag: 'movie_poster_${movie.id}',
+      ),
+    );
+  }
+}
+
+// 히어로 배너 위젯 (기존 코드 유지)
 class HeroBanner extends StatefulWidget {
   final List<Movie> movies;
 
@@ -284,7 +449,7 @@ class _HeroBannerState extends State<HeroBanner> {
   }
 }
 
-// 개선된 영화 섹션 위젯
+// ✨ 수정된 영화 섹션 위젯 (MovieCard 사용)
 class EnhancedMovieSection extends StatelessWidget {
   final String title;
   final List<Movie> movies;
@@ -346,122 +511,43 @@ class EnhancedMovieSection extends StatelessWidget {
             itemCount: movies.length,
             itemBuilder: (context, index) {
               final movie = movies[index];
-              return GestureDetector(
-                onTap: () {
-                  // final genreNames = movie.genreIds
-                  //     .map((id) => genreIdToName[id])
-                  //     .where((name) => name != null)
-                  //     .join(', ');
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => EnhancedDetailsScreen(movie: movie),
-                    ),
-                  );
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  margin: const EdgeInsets.symmetric(horizontal: 8.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // 포스터 이미지
-                      Container(
-                        width: 160,
-                        height: 220,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withAlpha(
-                                (255 * 0.3).round(),
-                              ),
-                              blurRadius: 8,
-                              offset: const Offset(0, 4),
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                child: Column(
+                  children: [
+                    // ✨ MovieCard 사용 (포스터 확장 애니메이션 적용)
+                    MovieCard(movie: movie),
+                    const SizedBox(height: 10),
+
+                    // 영화 제목과 연도
+                    SizedBox(
+                      width: 160,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            movie.title,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
                             ),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: Stack(
-                            children: [
-                              Hero(
-                                tag:
-                                    'movie_backdrop_${movie.title}_${movie.id}',
-                                child: Image.network(
-                                  movie.posterUrl,
-                                  fit: BoxFit.cover,
-                                  width: double.infinity,
-                                  height: double.infinity,
-                                ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          if (movie.releaseDate.isNotEmpty)
+                            Text(
+                              movie.releaseDate.split('-')[0],
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Colors.white60,
                               ),
-                              // 평점 배지
-                              Positioned(
-                                top: 8,
-                                right: 8,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withAlpha(
-                                      (255 * 0.7).round(),
-                                    ),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(
-                                        Icons.star,
-                                        color: Colors.amber,
-                                        size: 16,
-                                      ),
-                                      const SizedBox(width: 2),
-                                      Text(
-                                        movie.voteAverage.toStringAsFixed(1),
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                            ),
+                        ],
                       ),
-                      const SizedBox(height: 10),
-                      // 영화 제목
-                      SizedBox(
-                        width: 160,
-                        child: Text(
-                          movie.title,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      // 출시일
-                      if (movie.releaseDate.isNotEmpty)
-                        Text(
-                          movie.releaseDate.split('-')[0], // 연도만 표시
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: Colors.white60,
-                          ),
-                        ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               );
             },
@@ -472,7 +558,7 @@ class EnhancedMovieSection extends StatelessWidget {
   }
 }
 
-// 개선된 홈 스크린
+// 개선된 홈 스크린 (기존 코드 유지)
 class EnhancedHomeScreen extends StatefulWidget {
   const EnhancedHomeScreen({super.key});
 
@@ -671,6 +757,7 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen>
   }
 }
 
+// ✨ 완전히 새로운 상세 화면 (포스터 확장 애니메이션 적용)
 class EnhancedDetailsScreen extends StatefulWidget {
   final Movie movie;
 
@@ -680,199 +767,346 @@ class EnhancedDetailsScreen extends StatefulWidget {
   State<EnhancedDetailsScreen> createState() => _EnhancedDetailsScreenState();
 }
 
-class _EnhancedDetailsScreenState extends State<EnhancedDetailsScreen> {
-  PaletteGenerator? _paletteGenerator;
-  Color _dominantColor = Colors.black;
-  Color _textColor = Colors.white;
+class _EnhancedDetailsScreenState extends State<EnhancedDetailsScreen>
+    with TickerProviderStateMixin {
+  late AnimationController _fadeController;
+  late AnimationController _slideController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
 
   @override
   void initState() {
     super.initState();
-    _updatePalette();
-  }
 
-  Future<void> _updatePalette() async {
-    final imageProvider = NetworkImage(widget.movie.posterUrl);
-    final paletteGenerator = await PaletteGenerator.fromImageProvider(
-      imageProvider,
+    // 페이드 인 애니메이션
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
     );
-    setState(() {
-      _paletteGenerator = paletteGenerator;
-      _dominantColor = _paletteGenerator?.dominantColor?.color ?? Colors.black;
-      _textColor = _dominantColor.computeLuminance() > 0.5
-          ? Colors.black
-          : Colors.white;
+
+    // 슬라이드 애니메이션
+    _slideController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _fadeController,
+        curve: const Interval(0.3, 1.0, curve: Curves.easeOut),
+      ),
+    );
+
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+          CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic),
+        );
+
+    // 애니메이션 시작 (약간의 지연 후)
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        _fadeController.forward();
+        _slideController.forward();
+      }
     });
   }
 
-  Widget _buildGenreTags(Movie movie) {
-    final genreNames = movie.genreIds
-        .map((id) => genreIdToName[id])
-        .where((name) => name != null)
-        .toList();
-
-    if (genreNames.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Padding(
-      padding: const EdgeInsets.only(top: 8.0),
-      child: Wrap(
-        spacing: 8.0, // gap between adjacent chips
-        runSpacing: 4.0, // gap between lines
-        children: genreNames
-            .map(
-              (name) => Chip(
-                label: Text(
-                  name!,
-                  style: TextStyle(
-                    color: _dominantColor.computeLuminance() > 0.5
-                        ? Colors.black
-                        : Colors.white,
-                  ),
-                ),
-                backgroundColor: _dominantColor.withAlpha((255 * 0.3).round()),
-              ),
-            )
-            .toList(),
-      ),
-    );
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    _slideController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _dominantColor,
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Stack(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          // 메인 콘텐츠
+          SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // 포스터와 배경 이미지 섹션
+                _buildPosterSection(),
+
+                // 영화 정보 섹션
+                _buildMovieInfoSection(),
+              ],
+            ),
+          ),
+
+          // 뒤로가기 버튼
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 10,
+            left: 16,
+            child: FadeTransition(
+              opacity: _fadeAnimation,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.black.withAlpha((255 * 0.5).round()),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+
+      // 하단 버튼
+      bottomNavigationBar: FadeTransition(
+        opacity: _fadeAnimation,
+        child: SlideTransition(
+          position: _slideAnimation,
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: SizedBox(
+              height: 50,
+              child: ElevatedButton(
+                onPressed: () {
+                  // 버튼 클릭 애니메이션
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('티켓 구매 기능 준비중입니다!'),
+                      backgroundColor: Colors.amber,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.amber,
+                  foregroundColor: Colors.black,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 8,
+                ),
+                child: const Text(
+                  '티켓 예매하기',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPosterSection() {
+    return SizedBox(
+      height: 500,
+      child: Stack(
+        children: [
+          // 배경 이미지 (블러 처리)
+          Positioned.fill(
+            child: Hero(
+              tag: 'movie_backdrop_${widget.movie.id}',
+              child: Image.network(widget.movie.backdropUrl, fit: BoxFit.cover),
+            ),
+          ),
+
+          // 그라데이션 오버레이
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    Colors.black.withAlpha((255 * 0.3).round()),
+                    Colors.black.withAlpha((255 * 0.8).round()),
+                    Colors.black,
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // 포스터 이미지 (확장 애니메이션)
+          Positioned(
+            bottom: 60,
+            left: 20,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                // 포스터
                 Hero(
-                  tag:
-                      'movie_backdrop_${widget.movie.title}_${widget.movie.id}',
-                  child: Image.network(
-                    widget.movie.backdropUrl,
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                    height: 450,
+                  tag: 'movie_poster_${widget.movie.id}',
+                  child: Material(
+                    type: MaterialType.transparency,
+                    child: Container(
+                      width: 120,
+                      height: 160,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withAlpha((255 * 0.5).round()),
+                            blurRadius: 20,
+                            offset: const Offset(0, 10),
+                          ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.network(
+                          widget.movie.posterUrl,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-                Container(
-                  height: 450,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.transparent,
-                        _dominantColor.withAlpha((255 * 0.7).round()),
-                        _dominantColor,
+
+                const SizedBox(width: 16),
+
+                // 영화 기본 정보
+                FadeTransition(
+                  opacity: _fadeAnimation,
+                  child: SlideTransition(
+                    position: _slideAnimation,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(
+                          width: MediaQuery.of(context).size.width - 180,
+                          child: Text(
+                            widget.movie.title,
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.star,
+                              color: Colors.amber,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              widget.movie.voteAverage.toStringAsFixed(1),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 4),
+
+                        if (widget.movie.releaseDate.isNotEmpty)
+                          Text(
+                            widget.movie.releaseDate,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Colors.white70,
+                            ),
+                          ),
                       ],
                     ),
                   ),
                 ),
-                Positioned(
-                  top: 40,
-                  left: 16,
-                  child: IconButton(
-                    icon: Icon(Icons.arrow_back_ios, color: _textColor),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ),
-                Positioned(
-                  bottom: 16,
-                  left: 16,
-                  right: 16,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.movie.title,
-                        style: TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                          color: _textColor,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Icon(Icons.star, color: Colors.amber, size: 20),
-                          const SizedBox(width: 4),
-                          Text(
-                            widget.movie.voteAverage.toStringAsFixed(1),
-                            style: TextStyle(
-                              color: _textColor,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Text(
-                            widget.movie.releaseDate,
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: _textColor.withAlpha((255 * 0.8).round()),
-                            ),
-                          ),
-                        ],
-                      ),
-                      _buildGenreTags(widget.movie),
-                    ],
-                  ),
-                ),
               ],
             ),
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '줄거리',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: _textColor,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    widget.movie.overview,
-                    style: TextStyle(
-                      fontSize: 16,
-                      height: 1.5,
-                      color: _textColor.withAlpha((255 * 0.8).round()),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
-      bottomNavigationBar: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: SizedBox(
-          height: 50,
-          child: ElevatedButton(
-            onPressed: () {},
-            style: ElevatedButton.styleFrom(
-              backgroundColor:
-                  _paletteGenerator?.vibrantColor?.color ?? Colors.amber,
-              foregroundColor:
-                  _paletteGenerator?.vibrantColor?.bodyTextColor ??
-                  Colors.black,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+    );
+  }
+
+  Widget _buildMovieInfoSection() {
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: SlideTransition(
+        position: _slideAnimation,
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '줄거리',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
-            ),
-            child: const Text(
-              '감상하기',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
+              const SizedBox(height: 12),
+
+              Text(
+                widget.movie.overview,
+                style: const TextStyle(
+                  fontSize: 16,
+                  height: 1.6,
+                  color: Colors.white70,
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // 추가 정보들
+              if (widget.movie.genreIds.isNotEmpty) ...[
+                const Text(
+                  '장르',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: widget.movie.genreIds
+                      .map((id) => genreIdToName[id])
+                      .where((name) => name != null)
+                      .map(
+                        (name) => Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.withAlpha((255 * 0.2).round()),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Text(
+                            name!,
+                            style: const TextStyle(
+                              color: Colors.amber,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ),
+              ],
+
+              const SizedBox(height: 100), // 하단 버튼 공간 확보
+            ],
           ),
         ),
       ),
