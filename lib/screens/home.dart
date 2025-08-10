@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:theater/screens/details.dart';
 
 // 영화 목록을 표시하는 커스텀 위젯
 class MovieSection extends StatelessWidget {
   final String title;
-  final List<String> posterUrls;
+  final List<Map<String, String>> movies;
   final bool isLargePoster;
 
   const MovieSection({
     super.key,
     required this.title,
-    required this.posterUrls,
+    required this.movies,
     this.isLargePoster = false,
   });
 
@@ -29,16 +30,35 @@ class MovieSection extends StatelessWidget {
           height: isLargePoster ? 250 : 180,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
-            itemCount: posterUrls.length,
+            itemCount: movies.length,
             itemBuilder: (context, index) {
-              return Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12.0),
-                  child: Image.network(
-                    posterUrls[index],
-                    fit: BoxFit.cover,
-                    width: isLargePoster ? 300 : 120,
+              final movie = movies[index];
+              return GestureDetector(
+                // GestureDetector 위젯으로 감싸서 탭 이벤트 감지
+                onTap: () {
+                  // DetailsScreen으로 이동하는 라우팅 코드
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => DetailsScreen(
+                        title: movie['title']!,
+                        posterUrl: movie['posterUrl']!,
+                        rating: movie['rating']!,
+                        durationAndGenre: movie['durationAndGenre']!,
+                        storyline: movie['storyline']!,
+                      ),
+                    ),
+                  );
+                },
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12.0),
+                    child: Image.network(
+                      movie['posterUrl']!,
+                      fit: BoxFit.cover,
+                      width: isLargePoster ? 300 : 120,
+                    ),
                   ),
                 ),
               );
@@ -73,39 +93,72 @@ class HomeScreen extends StatelessWidget {
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
-            SizedBox(height: 16),
+          children: [
+            const SizedBox(height: 16),
             MovieSection(
               title: 'Popular Movies',
-              posterUrls: [
-                'https://image.tmdb.org/t/p/w500/rCzpDGLbOoPwLj3JcqqN3LHiuO9.jpg',
-                'https://image.tmdb.org/t/p/w500/yJ0w6lY4H4gNfW1Q22G5vj5C1rL.jpg',
-                'https://image.tmdb.org/t/p/w500/a2uNtyy54sYhV9s1E9n0o1rQ9D4.jpg',
-              ],
               isLargePoster: true,
+              movies: [
+                {
+                  'title': 'Avengers: Age of Ultron',
+                  'posterUrl':
+                      'https://image.tmdb.org/t/p/w500/rCzpDGLbOoPwLj3JcqqN3LHiuO9.jpg',
+                  'rating': '4.5',
+                  'durationAndGenre': '2h 21min | Action, Sci-Fi',
+                  'storyline':
+                      'When Tony Stark and Bruce Banner try to jump-start a dormant peacekeeping program called Ultron, things go horribly wrong and it\'s up to Earth\'s Mightiest Heroes to stop the villainous Ultron from enacting his terrible plans.',
+                },
+              ],
             ),
-            SizedBox(height: 24),
+            const SizedBox(height: 24),
             MovieSection(
               title: 'Now in Cinemas',
-              posterUrls: [
-                'https://image.tmdb.org/t/p/w500/aH0fE59c5d1qF5n5z8s6F6e6d1e.jpg',
-                'https://image.tmdb.org/t/p/w500/aQhD4Xh8t2wN0x9J5w7r9V5j9mG.jpg',
-                'https://image.tmdb.org/t/p/w500/iL8f65Xw8C3GgBvM3l24z6E6e6f.jpg',
-                'https://image.tmdb.org/t/p/w500/gW9e3d8eD6H3gV5h6G5j7l7a8b3.jpg',
+              movies: [
+                {
+                  'title': 'Spider-Man: Into the Spider-Verse',
+                  'posterUrl':
+                      'https://image.tmdb.org/t/p/w500/aH0fE59c5d1qF5n5z8s6F6e6d1e.jpg',
+                  'rating': '4.8',
+                  'durationAndGenre': '1h 57min | Animation, Action, Adventure',
+                  'storyline':
+                      'Bitten by a radioactive spider in the subway, Brooklyn teenager Miles Morales suddenly develops mysterious powers that transform him into the one and only Spider-Man.',
+                },
+                {
+                  'title': 'First Man',
+                  'posterUrl':
+                      'https://image.tmdb.org/t/p/w500/aQhD4Xh8t2wN0x9J5w7r9V5j9mG.jpg',
+                  'rating': '4.2',
+                  'durationAndGenre': '2h 21min | Biography, Drama',
+                  'storyline':
+                      'A look at the life of the astronaut, Neil Armstrong, and the legendary space mission that led him to become the first man to walk on the Moon on July 20, 1969.',
+                },
+                {
+                  'title': 'Bohemian Rhapsody',
+                  'posterUrl':
+                      'https://image.tmdb.org/t/p/w500/iL8f65Xw8C3GgBvM3l24z6E6e6f.jpg',
+                  'rating': '4.7',
+                  'durationAndGenre': '2h 14min | Biography, Drama, Music',
+                  'storyline':
+                      'Bohemian Rhapsody is a foot-stomping celebration of Queen, their music and their extraordinary lead singer Freddie Mercury.',
+                },
               ],
-              isLargePoster: false,
             ),
-            SizedBox(height: 24),
+            const SizedBox(height: 24),
             MovieSection(
               title: 'Coming soon',
-              posterUrls: [
-                'https://image.tmdb.org/t/p/w500/hE4P3F2l1p1P7b7g0a4b6c6b3e3.jpg',
-                'https://image.tmdb.org/t/p/w500/bJ836e5x7j2u4g6d5p1n2m9k3o4.jpg',
-                'https://image.tmdb.org/t/p/w500/bL9y2y6c9d8e7h2f5g3t1y7r8q0.jpg',
+              movies: [
+                {
+                  'title': 'The Marvels',
+                  'posterUrl':
+                      'https://image.tmdb.org/t/p/w500/hE4P3F2l1p1P7b7g0a4b6c6b3e3.jpg',
+                  'rating': '0.0',
+                  'durationAndGenre': 'TBD',
+                  'storyline':
+                      'Carol Danvers, Monica Rambeau, and Kamala Khan team up to save the universe.',
+                },
               ],
-              isLargePoster: false,
             ),
-            SizedBox(height: 24),
+            const SizedBox(height: 24),
           ],
         ),
       ),
