@@ -1,18 +1,38 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'package:theater/screens/details.dart';
+
+// 영화 정보를 저장하는 모델 클래스
+class Movie {
+  final String title;
+  final String posterUrl;
+  final double voteAverage;
+  final String overview;
+
+  Movie({
+    required this.title,
+    required this.posterUrl,
+    required this.voteAverage,
+    required this.overview,
+  });
+
+  factory Movie.fromJson(Map<String, dynamic> json) {
+    return Movie(
+      title: json['title'] as String,
+      posterUrl: 'https://image.tmdb.org/t/p/w500${json['poster_path']}',
+      voteAverage: (json['vote_average'] as num).toDouble(),
+      overview: json['overview'] as String,
+    );
+  }
+}
 
 // 영화 목록을 표시하는 커스텀 위젯
 class MovieSection extends StatelessWidget {
   final String title;
-  final List<Map<String, String>> movies;
-  final bool isLargePoster;
+  final List<Movie> movies;
 
-  const MovieSection({
-    super.key,
-    required this.title,
-    required this.movies,
-    this.isLargePoster = false,
-  });
+  const MovieSection({super.key, required this.title, required this.movies});
 
   @override
   Widget build(BuildContext context) {
@@ -20,45 +40,67 @@ class MovieSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
           child: Text(
             title,
             style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
           ),
         ),
         SizedBox(
-          height: isLargePoster ? 250 : 180,
+          height: 280,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
-            itemCount: movies.length,
+            itemCount: movies.length * 3, // 3번 반복하여 무한 스크롤 효과
             itemBuilder: (context, index) {
-              final movie = movies[index];
+              final movieIndex = index % movies.length; // 실제 영화 인덱스
+              final movie = movies[movieIndex];
               return GestureDetector(
-                // GestureDetector 위젯으로 감싸서 탭 이벤트 감지
                 onTap: () {
-                  // DetailsScreen으로 이동하는 라우팅 코드
                   Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (context) => DetailsScreen(
-                        title: movie['title']!,
-                        posterUrl: movie['posterUrl']!,
-                        rating: movie['rating']!,
-                        durationAndGenre: movie['durationAndGenre']!,
-                        storyline: movie['storyline']!,
+                        title: movie.title,
+                        posterUrl: movie.posterUrl,
+                        rating: movie.voteAverage.toStringAsFixed(
+                          1,
+                        ), // 평점 소수점 첫째 자리까지
+                        durationAndGenre:
+                            '영화 장르와 상영 시간 정보', // API에 포함되지 않아 임시로 추가
+                        storyline: movie.overview,
                       ),
                     ),
                   );
                 },
                 child: Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12.0),
-                    child: Image.network(
-                      movie['posterUrl']!,
-                      fit: BoxFit.cover,
-                      width: isLargePoster ? 300 : 120,
-                    ),
+                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                  child: Column(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12.0),
+                        child: Image.network(
+                          movie.posterUrl,
+                          fit: BoxFit.cover,
+                          width: 150,
+                          height: 200,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: 150,
+                        child: Text(
+                          movie.title,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                          textAlign: TextAlign.left,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               );
@@ -71,8 +113,41 @@ class MovieSection extends StatelessWidget {
 }
 
 // 홈 스크린 위젯
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  List<Movie> popularMovies = [];
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchPopularMovies();
+  }
+
+  // API를 호출하여 인기 영화 데이터를 가져오는 함수
+  Future<void> fetchPopularMovies() async {
+    final response = await http.get(
+      Uri.parse('https://movies-api.nomadcoders.workers.dev/popular'),
+    );
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      setState(() {
+        popularMovies = (data['results'] as List)
+            .map((movieJson) => Movie.fromJson(movieJson))
+            .toList();
+        isLoading = false;
+      });
+    } else {
+      throw Exception('Failed to load popular movies');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -90,78 +165,19 @@ class HomeScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 16),
-            MovieSection(
-              title: 'Popular Movies',
-              isLargePoster: true,
-              movies: [
-                {
-                  'title': 'Avengers: Age of Ultron',
-                  'posterUrl':
-                      'https://image.tmdb.org/t/p/w500/rCzpDGLbOoPwLj3JcqqN3LHiuO9.jpg',
-                  'rating': '4.5',
-                  'durationAndGenre': '2h 21min | Action, Sci-Fi',
-                  'storyline':
-                      'When Tony Stark and Bruce Banner try to jump-start a dormant peacekeeping program called Ultron, things go horribly wrong and it\'s up to Earth\'s Mightiest Heroes to stop the villainous Ultron from enacting his terrible plans.',
-                },
-              ],
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 16),
+                  MovieSection(title: 'Popular Movies', movies: popularMovies),
+                  const SizedBox(height: 24),
+                  // 다른 섹션들은 원하는 데이터를 추가하여 구현 가능
+                ],
+              ),
             ),
-            const SizedBox(height: 24),
-            MovieSection(
-              title: 'Now in Cinemas',
-              movies: [
-                {
-                  'title': 'Spider-Man: Into the Spider-Verse',
-                  'posterUrl':
-                      'https://image.tmdb.org/t/p/w500/aH0fE59c5d1qF5n5z8s6F6e6d1e.jpg',
-                  'rating': '4.8',
-                  'durationAndGenre': '1h 57min | Animation, Action, Adventure',
-                  'storyline':
-                      'Bitten by a radioactive spider in the subway, Brooklyn teenager Miles Morales suddenly develops mysterious powers that transform him into the one and only Spider-Man.',
-                },
-                {
-                  'title': 'First Man',
-                  'posterUrl':
-                      'https://image.tmdb.org/t/p/w500/aQhD4Xh8t2wN0x9J5w7r9V5j9mG.jpg',
-                  'rating': '4.2',
-                  'durationAndGenre': '2h 21min | Biography, Drama',
-                  'storyline':
-                      'A look at the life of the astronaut, Neil Armstrong, and the legendary space mission that led him to become the first man to walk on the Moon on July 20, 1969.',
-                },
-                {
-                  'title': 'Bohemian Rhapsody',
-                  'posterUrl':
-                      'https://image.tmdb.org/t/p/w500/iL8f65Xw8C3GgBvM3l24z6E6e6f.jpg',
-                  'rating': '4.7',
-                  'durationAndGenre': '2h 14min | Biography, Drama, Music',
-                  'storyline':
-                      'Bohemian Rhapsody is a foot-stomping celebration of Queen, their music and their extraordinary lead singer Freddie Mercury.',
-                },
-              ],
-            ),
-            const SizedBox(height: 24),
-            MovieSection(
-              title: 'Coming soon',
-              movies: [
-                {
-                  'title': 'The Marvels',
-                  'posterUrl':
-                      'https://image.tmdb.org/t/p/w500/hE4P3F2l1p1P7b7g0a4b6c6b3e3.jpg',
-                  'rating': '0.0',
-                  'durationAndGenre': 'TBD',
-                  'storyline':
-                      'Carol Danvers, Monica Rambeau, and Kamala Khan team up to save the universe.',
-                },
-              ],
-            ),
-            const SizedBox(height: 24),
-          ],
-        ),
-      ),
     );
   }
 }
