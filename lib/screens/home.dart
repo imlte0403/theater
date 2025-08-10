@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:theater/screens/details.dart';
+import 'package:palette_generator/palette_generator.dart';
 
 const Map<int, String> genreIdToName = {
   28: 'Action',
@@ -27,6 +27,7 @@ const Map<int, String> genreIdToName = {
 
 // 영화 정보를 저장하는 모델 클래스
 class Movie {
+  final int? id;
   final String title;
   final String posterUrl;
   final String backdropUrl;
@@ -36,6 +37,7 @@ class Movie {
   final List<int> genreIds;
 
   Movie({
+    required this.id,
     required this.title,
     required this.posterUrl,
     required this.backdropUrl,
@@ -47,6 +49,7 @@ class Movie {
 
   factory Movie.fromJson(Map<String, dynamic> json) {
     return Movie(
+      id: json['id'] as int? ?? 0,
       title: json['title'] as String,
       posterUrl: 'https://image.tmdb.org/t/p/w500${json['poster_path']}',
       backdropUrl: json['backdrop_path'] != null
@@ -122,11 +125,14 @@ class _HeroBannerState extends State<HeroBanner> {
                 child: Stack(
                   children: [
                     // 배경 이미지
-                    Container(
-                      decoration: BoxDecoration(
-                        image: DecorationImage(
-                          image: NetworkImage(movie.backdropUrl),
-                          fit: BoxFit.cover,
+                    Hero(
+                      tag: 'movie_backdrop_${movie.title}_${movie.id}',
+                      child: Container(
+                        decoration: BoxDecoration(
+                          image: DecorationImage(
+                            image: NetworkImage(movie.backdropUrl),
+                            fit: BoxFit.cover,
+                          ),
                         ),
                       ),
                     ),
@@ -263,20 +269,10 @@ class _HeroBannerState extends State<HeroBanner> {
   }
 
   void _navigateToDetails(Movie movie) {
-    final genreNames = movie.genreIds
-        .map((id) => genreIdToName[id])
-        .where((name) => name != null)
-        .join(', ');
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => DetailsScreen(
-          title: movie.title,
-          posterUrl: movie.posterUrl,
-          rating: movie.voteAverage.toStringAsFixed(1),
-          durationAndGenre: genreNames,
-          storyline: movie.overview,
-        ),
+        builder: (context) => EnhancedDetailsScreen(movie: movie),
       ),
     );
   }
@@ -352,20 +348,14 @@ class EnhancedMovieSection extends StatelessWidget {
               final movie = movies[index];
               return GestureDetector(
                 onTap: () {
-                  final genreNames = movie.genreIds
-                      .map((id) => genreIdToName[id])
-                      .where((name) => name != null)
-                      .join(', ');
+                  // final genreNames = movie.genreIds
+                  //     .map((id) => genreIdToName[id])
+                  //     .where((name) => name != null)
+                  //     .join(', ');
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => DetailsScreen(
-                        title: movie.title,
-                        posterUrl: movie.posterUrl,
-                        rating: movie.voteAverage.toStringAsFixed(1),
-                        durationAndGenre: genreNames,
-                        storyline: movie.overview,
-                      ),
+                      builder: (context) => EnhancedDetailsScreen(movie: movie),
                     ),
                   );
                 },
@@ -395,11 +385,15 @@ class EnhancedMovieSection extends StatelessWidget {
                           borderRadius: BorderRadius.circular(16),
                           child: Stack(
                             children: [
-                              Image.network(
-                                movie.posterUrl,
-                                fit: BoxFit.cover,
-                                width: double.infinity,
-                                height: double.infinity,
+                              Hero(
+                                tag:
+                                    'movie_backdrop_${movie.title}_${movie.id}',
+                                child: Image.network(
+                                  movie.posterUrl,
+                                  fit: BoxFit.cover,
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                ),
                               ),
                               // 평점 배지
                               Positioned(
@@ -677,34 +671,105 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen>
   }
 }
 
-// 간단한 상세 화면 (기존 DetailsScreen 대체용)
-class EnhancedDetailsScreen extends StatelessWidget {
+class EnhancedDetailsScreen extends StatefulWidget {
   final Movie movie;
 
   const EnhancedDetailsScreen({super.key, required this.movie});
 
   @override
+  State<EnhancedDetailsScreen> createState() => _EnhancedDetailsScreenState();
+}
+
+class _EnhancedDetailsScreenState extends State<EnhancedDetailsScreen> {
+  PaletteGenerator? _paletteGenerator;
+  Color _dominantColor = Colors.black;
+  Color _textColor = Colors.white;
+
+  @override
+  void initState() {
+    super.initState();
+    _updatePalette();
+  }
+
+  Future<void> _updatePalette() async {
+    final imageProvider = NetworkImage(widget.movie.posterUrl);
+    final paletteGenerator = await PaletteGenerator.fromImageProvider(
+      imageProvider,
+    );
+    setState(() {
+      _paletteGenerator = paletteGenerator;
+      _dominantColor = _paletteGenerator?.dominantColor?.color ?? Colors.black;
+      _textColor = _dominantColor.computeLuminance() > 0.5
+          ? Colors.black
+          : Colors.white;
+    });
+  }
+
+  Widget _buildGenreTags(Movie movie) {
+    final genreNames = movie.genreIds
+        .map((id) => genreIdToName[id])
+        .where((name) => name != null)
+        .toList();
+
+    if (genreNames.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8.0),
+      child: Wrap(
+        spacing: 8.0, // gap between adjacent chips
+        runSpacing: 4.0, // gap between lines
+        children: genreNames
+            .map(
+              (name) => Chip(
+                label: Text(
+                  name!,
+                  style: TextStyle(
+                    color: _dominantColor.computeLuminance() > 0.5
+                        ? Colors.black
+                        : Colors.white,
+                  ),
+                ),
+                backgroundColor: _dominantColor.withAlpha((255 * 0.3).round()),
+              ),
+            )
+            .toList(),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: _dominantColor,
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Stack(
               children: [
-                Image.network(
-                  movie.backdropUrl,
-                  fit: BoxFit.cover,
-                  width: double.infinity,
-                  height: 450,
+                Hero(
+                  tag:
+                      'movie_backdrop_${widget.movie.title}_${widget.movie.id}',
+                  child: Image.network(
+                    widget.movie.backdropUrl,
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    height: 450,
+                  ),
                 ),
                 Container(
                   height: 450,
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      colors: [Colors.transparent, Colors.black],
+                      colors: [
+                        Colors.transparent,
+                        _dominantColor.withAlpha((255 * 0.7).round()),
+                        _dominantColor,
+                      ],
                     ),
                   ),
                 ),
@@ -712,7 +777,7 @@ class EnhancedDetailsScreen extends StatelessWidget {
                   top: 40,
                   left: 16,
                   child: IconButton(
-                    icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+                    icon: Icon(Icons.arrow_back_ios, color: _textColor),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ),
@@ -724,36 +789,37 @@ class EnhancedDetailsScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        movie.title,
-                        style: const TextStyle(
+                        widget.movie.title,
+                        style: TextStyle(
                           fontSize: 32,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          color: _textColor,
                         ),
                       ),
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          const Icon(Icons.star, color: Colors.amber, size: 20),
+                          Icon(Icons.star, color: Colors.amber, size: 20),
                           const SizedBox(width: 4),
                           Text(
-                            movie.voteAverage.toStringAsFixed(1),
-                            style: const TextStyle(
-                              color: Colors.white,
+                            widget.movie.voteAverage.toStringAsFixed(1),
+                            style: TextStyle(
+                              color: _textColor,
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
                           const SizedBox(width: 16),
                           Text(
-                            movie.releaseDate,
-                            style: const TextStyle(
+                            widget.movie.releaseDate,
+                            style: TextStyle(
                               fontSize: 16,
-                              color: Colors.white70,
+                              color: _textColor.withAlpha((255 * 0.8).round()),
                             ),
                           ),
                         ],
                       ),
+                      _buildGenreTags(widget.movie),
                     ],
                   ),
                 ),
@@ -764,17 +830,21 @@ class EnhancedDetailsScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Storyline',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  Text(
+                    '줄거리',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: _textColor,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    movie.overview,
-                    style: const TextStyle(
+                    widget.movie.overview,
+                    style: TextStyle(
                       fontSize: 16,
                       height: 1.5,
-                      color: Colors.white70,
+                      color: _textColor.withAlpha((255 * 0.8).round()),
                     ),
                   ),
                 ],
@@ -790,14 +860,17 @@ class EnhancedDetailsScreen extends StatelessWidget {
           child: ElevatedButton(
             onPressed: () {},
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.amber,
-              foregroundColor: Colors.black,
+              backgroundColor:
+                  _paletteGenerator?.vibrantColor?.color ?? Colors.amber,
+              foregroundColor:
+                  _paletteGenerator?.vibrantColor?.bodyTextColor ??
+                  Colors.black,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
             child: const Text(
-              'Buy Ticket',
+              '감상하기',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
           ),
