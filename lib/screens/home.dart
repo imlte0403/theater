@@ -3,18 +3,19 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:theater/screens/details.dart';
 
-// 영화 정보를 저장하는 모델 클래스
 class Movie {
   final String title;
   final String posterUrl;
   final double voteAverage;
   final String overview;
+  final int id; // 영화 고유 ID 추가
 
   Movie({
     required this.title,
     required this.posterUrl,
     required this.voteAverage,
     required this.overview,
+    required this.id,
   });
 
   factory Movie.fromJson(Map<String, dynamic> json) {
@@ -23,11 +24,11 @@ class Movie {
       posterUrl: 'https://image.tmdb.org/t/p/w500${json['poster_path']}',
       voteAverage: (json['vote_average'] as num).toDouble(),
       overview: json['overview'] as String,
+      id: json['id'] as int,
     );
   }
 }
 
-// 영화 목록을 표시하는 커스텀 위젯
 class MovieSection extends StatelessWidget {
   final String title;
   final List<Movie> movies;
@@ -47,13 +48,12 @@ class MovieSection extends StatelessWidget {
           ),
         ),
         SizedBox(
-          height: 280,
+          height: 260,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
-            itemCount: movies.length * 3, // 3번 반복하여 무한 스크롤 효과
+            itemCount: movies.length,
             itemBuilder: (context, index) {
-              final movieIndex = index % movies.length; // 실제 영화 인덱스
-              final movie = movies[movieIndex];
+              final movie = movies[index];
               return GestureDetector(
                 onTap: () {
                   Navigator.push(
@@ -62,11 +62,8 @@ class MovieSection extends StatelessWidget {
                       builder: (context) => DetailsScreen(
                         title: movie.title,
                         posterUrl: movie.posterUrl,
-                        rating: movie.voteAverage.toStringAsFixed(
-                          1,
-                        ), // 평점 소수점 첫째 자리까지
-                        durationAndGenre:
-                            '영화 장르와 상영 시간 정보', // API에 포함되지 않아 임시로 추가
+                        rating: movie.voteAverage.toStringAsFixed(1),
+                        durationAndGenre: '영화 장르와 상영 시간 정보',
                         storyline: movie.overview,
                       ),
                     ),
@@ -112,7 +109,6 @@ class MovieSection extends StatelessWidget {
   }
 }
 
-// 홈 스크린 위젯
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -122,30 +118,157 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   List<Movie> popularMovies = [];
+  List<Movie> nowInCinemasMovies = [];
+  List<Movie> comingSoonMovies = [];
   bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    fetchPopularMovies();
+    fetchMovies();
   }
 
-  // API를 호출하여 인기 영화 데이터를 가져오는 함수
-  Future<void> fetchPopularMovies() async {
-    final response = await http.get(
-      Uri.parse('https://movies-api.nomadcoders.workers.dev/popular'),
-    );
+  Future<void> fetchMovies() async {
+    try {
+      // 각 API를 순차적으로 호출하여 안정성 향상
+      await fetchPopularMovies();
+      await fetchNowInCinemasMovies();
+      await fetchComingSoonMovies();
+    } catch (e) {
+      print('Error fetching movies: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    }
+  }
 
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      setState(() {
-        popularMovies = (data['results'] as List)
+  Future<void> fetchPopularMovies() async {
+    try {
+      final uri = Uri.parse(
+        'https://movies-api.nomadcoders.workers.dev/popular?_=${DateTime.now().millisecondsSinceEpoch}',
+      );
+      final response = await http.get(uri);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final List<Movie> movies = (data['results'] as List)
             .map((movieJson) => Movie.fromJson(movieJson))
             .toList();
-        isLoading = false;
-      });
-    } else {
-      throw Exception('Failed to load popular movies');
+
+        // 디버깅용 로그 - API 응답 상세 확인
+        print('=== POPULAR API RESPONSE ===');
+        print('URL: ${uri.toString()}');
+        print('Status: ${response.statusCode}');
+        print('Movies count: ${movies.length}');
+        if (movies.isNotEmpty) {
+          print('First movie: ${movies.first.title} (ID: ${movies.first.id})');
+          print('Last movie: ${movies.last.title} (ID: ${movies.last.id})');
+        }
+        print('==========================');
+
+        if (mounted) {
+          setState(() {
+            popularMovies = movies;
+          });
+        }
+      } else {
+        throw Exception(
+          'Failed to load popular movies: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      print('Error in fetchPopularMovies: $e');
+      if (mounted) {
+        setState(() {
+          popularMovies = [];
+        });
+      }
+    }
+  }
+
+  Future<void> fetchNowInCinemasMovies() async {
+    try {
+      final uri = Uri.parse(
+        'https://movies-api.nomadcoders.workers.dev/now-playing?_=${DateTime.now().millisecondsSinceEpoch}',
+      );
+      final response = await http.get(uri);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final List<Movie> movies = (data['results'] as List)
+            .map((movieJson) => Movie.fromJson(movieJson))
+            .toList();
+
+        // 디버깅용 로그 - API 응답 상세 확인
+        print('=== NOW PLAYING API RESPONSE ===');
+        print('URL: ${uri.toString()}');
+        print('Status: ${response.statusCode}');
+        print('Movies count: ${movies.length}');
+        if (movies.isNotEmpty) {
+          print('First movie: ${movies.first.title} (ID: ${movies.first.id})');
+          print('Last movie: ${movies.last.title} (ID: ${movies.last.id})');
+        }
+        print('================================');
+
+        if (mounted) {
+          setState(() {
+            nowInCinemasMovies = movies;
+          });
+        }
+      } else {
+        throw Exception(
+          'Failed to load now in cinemas movies: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      print('Error in fetchNowInCinemasMovies: $e');
+      if (mounted) {
+        setState(() {
+          nowInCinemasMovies = [];
+        });
+      }
+    }
+  }
+
+  Future<void> fetchComingSoonMovies() async {
+    try {
+      final uri = Uri.parse(
+        'https://movies-api.nomadcoders.workers.dev/coming-soon?_=${DateTime.now().millisecondsSinceEpoch}',
+      );
+      final response = await http.get(uri);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final List<Movie> movies = (data['results'] as List)
+            .map((movieJson) => Movie.fromJson(movieJson))
+            .toList();
+
+        // 디버깅용 로그
+        print('Coming Soon: ${movies.length} movies loaded');
+        print(
+          'First coming soon movie: ${movies.isNotEmpty ? movies.first.title : 'None'}',
+        );
+
+        if (mounted) {
+          setState(() {
+            comingSoonMovies = movies;
+          });
+        }
+      } else {
+        throw Exception(
+          'Failed to load coming soon movies: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      print('Error in fetchComingSoonMovies: $e');
+      if (mounted) {
+        setState(() {
+          comingSoonMovies = [];
+        });
+      }
     }
   }
 
@@ -158,9 +281,8 @@ class _HomeScreenState extends State<HomeScreen> {
           Padding(
             padding: EdgeInsets.all(8.0),
             child: CircleAvatar(
-              backgroundImage: NetworkImage(
-                'https://example.com/your_profile_image.jpg',
-              ),
+              backgroundColor: Colors.grey,
+              child: Icon(Icons.person, color: Colors.white),
             ),
           ),
         ],
@@ -172,9 +294,23 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 16),
-                  MovieSection(title: 'Popular Movies', movies: popularMovies),
-                  const SizedBox(height: 24),
-                  // 다른 섹션들은 원하는 데이터를 추가하여 구현 가능
+                  if (popularMovies.isNotEmpty)
+                    MovieSection(
+                      title: 'Popular Movies',
+                      movies: popularMovies,
+                    ),
+                  const SizedBox(height: 16),
+                  if (nowInCinemasMovies.isNotEmpty)
+                    MovieSection(
+                      title: 'Now in Cinemas',
+                      movies: nowInCinemasMovies,
+                    ),
+                  const SizedBox(height: 16),
+                  if (comingSoonMovies.isNotEmpty)
+                    MovieSection(
+                      title: 'Coming Soon',
+                      movies: comingSoonMovies,
+                    ),
                 ],
               ),
             ),
