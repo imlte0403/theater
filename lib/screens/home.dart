@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:ui';
-import 'package:palette_generator/palette_generator.dart';
 
 const Map<int, String> genreIdToName = {
   28: 'Action',
