@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:theater/screens/home.dart';
+import 'package:theater/screens/home.dart' show EnhancedHomeScreen;
 
 void main() {
   runApp(const MyApp());
@@ -13,7 +13,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark(),
-      home: const HomeScreen(),
+      home: const EnhancedHomeScreen(),
     );
   }
 }
