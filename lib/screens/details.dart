@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:theater/data/movie.dart';
-import 'package:theater/constants/app_constants.dart';
 
 class EnhancedDetailsScreen extends StatefulWidget {
   final Movie movie;

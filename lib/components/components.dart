@@ -167,7 +167,7 @@ class _HeroBannerState extends State<HeroBanner> {
 
     final bannerMovies = widget.movies.take(5).toList();
 
-    return Container(
+    return SizedBox(
       height: 400,
       child: Stack(
         children: [
